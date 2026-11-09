@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "X 快速回复 · AI 草稿",
+  "version": "0.4.0",
+  "description": "在 X 时间线上给每条推文加一个按钮：调用 AI 做语义分析，生成 3 条人味回复草稿，填进回复框由你自己发。默认不自动发送。",
+  "permissions": [
+    "storage",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "https://x.com/*",
+    "https://twitter.com/*",
+    "https://api.deepseek.com/*"
+  ],
+  "optional_host_permissions": [
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "src/bg.js"
+  },
+  "action": {
+    "default_title": "X 快速回复",
+    "default_popup": "popup.html"
+  },
+  "icons": {
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://x.com/*",
+        "https://twitter.com/*"
+      ],
+      "js": [
+        "src/reply-style.js",
+        "src/gen.js",
+        "src/content.js"
+      ],
+      "css": [
+        "src/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

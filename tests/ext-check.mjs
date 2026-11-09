@@ -1,0 +1,16 @@
+const port = 9222
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const list = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json()
+console.log('targets:', list.map(t => t.type + ':' + String(t.url).slice(0, 50)).join('\n'))
+const ver = await (await fetch('http://127.0.0.1:' + port + '/json/version')).json()
+const bws = new WebSocket(ver.webSocketDebuggerUrl)
+await new Promise((r, j) => { bws.onopen = r; bws.onerror = j })
+let bid = 0; const bp = new Map()
+bws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.id && bp.has(m.id)) { bp.get(m.id)(m); bp.delete(m.id) } }
+const bsend = (m, p) => new Promise((res) => { const i = ++bid; bp.set(i, res); bws.send(JSON.stringify({ id: i, method: m, params: p || {} })); setTimeout(() => { if (bp.has(i)) { bp.delete(i); res({ __t: 1 }) } }, 12000) })
+const ext = await bsend('Extensions.loadUnpacked', { path: 'D:/dsh/x-reply-extension' })
+console.log('loadUnpacked:', JSON.stringify(ext.result || ext.error).slice(0, 200))
+await sleep(1500)
+const l2 = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json()
+console.log('ext targets:', l2.filter(t => String(t.url).startsWith('chrome-extension://')).map(t => t.url.slice(0, 70)).join(' | ') || 'none')
+bws.close(); process.exit(0)
