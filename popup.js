@@ -54,17 +54,38 @@ const showCorpus = (c) => {
   el.textContent = '已学 ' + c.count + ' 条 · 中位 ' + c.stats.median + ' 字 · 一句 ' + c.stats.oneSentencePct + '%（' + d + '）'
 }
 chrome.storage.local.get({ myCorpus: null }, (v) => showCorpus(v.myCorpus))
+async function ensureInjected(tabId) {
+  // 老标签页里的脚本可能是旧版/已失效：补注入一次最新的
+  if (!chrome.scripting || !chrome.scripting.executeScript) return false
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['src/reply-style.js', 'src/gen.js', 'src/content.js'] })
+    return true
+  } catch (e) { return false }
+}
+
+function sendLearn(tabId) {
+  return new Promise((resolve) => {
+    chrome.tabs.sendMessage(tabId, { type: 'learn:start' }, (res) => resolve(res))
+  })
+}
+
 document.getElementById('learn')?.addEventListener('click', async () => {
   const el = document.getElementById('learnStatus')
   el.textContent = '正在扫你的主页…（会自动往下滚，几十秒）'
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
   if (!tab || !/x\.com|twitter\.com/.test(tab.url || '')) { el.textContent = '先打开你自己的 X 主页再点'; return }
   try {
-    chrome.tabs.sendMessage(tab.id, { type: 'learn:start' }, (res) => {
-      if (!res) return (el.textContent = '页面没响应：刷新一下扩展再试')
-      if (!res.ok) return (el.textContent = '失败：' + res.reason)
-      el.textContent = '已学 ' + res.count + ' 条（@' + res.handle + '）· 中位 ' + res.stats.median + ' 字'
-      chrome.storage.local.get({ myCorpus: null }, (v) => showCorpus(v.myCorpus))
-    })
+    let res = await sendLearn(tab.id)
+    if (!res) {
+      el.textContent = '旧页面没响应，正在补注入最新脚本…'
+      const ok = await ensureInjected(tab.id)
+      if (!ok) return (el.textContent = '补注入失败：这个页面可能不是 x.com，或权限被拒（重载扩展一次）')
+      await new Promise((r) => setTimeout(r, 600))
+      res = await sendLearn(tab.id)
+    }
+    if (!res) return (el.textContent = '仍然没响应：到 chrome://extensions 点该扩展「刷新」，再刷新这个页面')
+    if (!res.ok) return (el.textContent = '失败：' + res.reason)
+    el.textContent = '已学 ' + res.count + ' 条（@' + res.handle + '）· 中位 ' + res.stats.median + ' 字'
+    chrome.storage.local.get({ myCorpus: null }, (v) => showCorpus(v.myCorpus))
   } catch (e) { el.textContent = '失败：' + e.message }
 })

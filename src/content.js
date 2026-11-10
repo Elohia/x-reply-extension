@@ -8,6 +8,8 @@
  */
 (function () {
   'use strict'
+  if (window.__xrLoaded) return // 防止重复注入（popup 的补注入会和已注入的撞车）
+  window.__xrLoaded = true
   const GEN = window.XReplyGen
   if (!GEN) return
   const DEFAULTS = { enabled: true, tone: 'direct', length: 'short', aiEnabled: false, autoOpen: true }
