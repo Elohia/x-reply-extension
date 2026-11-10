@@ -428,6 +428,85 @@
   }
   function hideBar() { if (barTimer) { clearInterval(barTimer); barTimer = null } if (bar) { bar.remove(); bar = null } }
 
+  /* ── 学习自己的推文（本地语料库） ───────────────── */
+  function ownHandle() {
+    const link = document.querySelector('a[data-testid="AppTabBar_Profile_Link"]')
+    const href = link && link.getAttribute('href')
+    return href ? href.replace(/^\//, '') : ''
+  }
+
+  function statOf(texts) {
+    const lens = texts.map((t) => Array.from(t).length).sort((a, b) => a - b)
+    const med = lens.length ? lens[Math.floor(lens.length / 2)] : 0
+    const p90 = lens.length ? lens[Math.floor(lens.length * 0.9)] : 0
+    const one = texts.filter((t) => (t.split(/[。！？!?\n]/).filter((x) => x.trim()).length) <= 1).length
+    const q = texts.filter((t) => /[?？]/.test(t)).length
+    const emo = texts.filter((t) => /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(t)).length
+    const openers = {}
+    for (const t of texts) { const k = Array.from(t.trim()).slice(0, 2).join(''); openers[k] = (openers[k] || 0) + 1 }
+    const topOpeners = Object.entries(openers).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => k + '(' + v + ')')
+    const pct = (n) => texts.length ? Math.round((100 * n) / texts.length) : 0
+    return { n: texts.length, median: med, p90, oneSentencePct: pct(one), questionPct: pct(q), emojiPct: pct(emo), topOpeners }
+  }
+
+  async function learnMyPosts() {
+    const me = ownHandle()
+    if (!me) return { ok: false, reason: '没认出你的账号（找不到左侧「个人资料」入口）' }
+    const path = decodeURIComponent(location.pathname).replace(/^\//, '').split(/[/?]/)[0]
+    if (path.toLowerCase() !== me.toLowerCase()) return { ok: false, reason: '先打开你自己的主页（点左侧「个人资料」），再点学习' }
+
+    const seen = new Set()
+    const texts = []
+    let idle = 0
+    for (let round = 0; round < 14 && texts.length < 80; round++) {
+      const arts = document.querySelectorAll('article[data-testid="tweet"]')
+      let added = 0
+      for (const a of arts) {
+        const el = a.querySelector('[data-testid="tweetText"]')
+        if (!el) continue
+        const t = el.innerText.trim()
+        if (!t || t.length < 4 || seen.has(t)) continue
+        if (/^https?:\/\//.test(t)) continue
+        seen.add(t); texts.push(t); added++
+      }
+      if (!added) idle++; else idle = 0
+      if (idle >= 3) break
+      window.scrollBy(0, 2200)
+      await new Promise((r) => setTimeout(r, 1100))
+    }
+    if (texts.length < 5) return { ok: false, reason: '只扫到 ' + texts.length + ' 条，往下滚一点再试' }
+    const stats = statOf(texts)
+    const examples = texts
+      .filter((t) => { const n = Array.from(t).length; return n >= 12 && n <= 70 })
+      .sort((a, b) => (b.match(/\d/g) || []).length - (a.match(/\d/g) || []).length)
+      .slice(0, 10)
+    const corpus = { handle: me, builtAt: Date.now(), count: texts.length, stats, examples, sample: texts.slice(0, 40) }
+    await chrome.storage.local.set({ myCorpus: corpus })
+    return { ok: true, handle: me, count: texts.length, stats }
+  }
+
+  /** X 点「回复」有时整页跳到 /compose/post：回来自动把候选条挂上 */
+  ;(function resumeAfterNavigation() {
+    let saved = null
+    try { saved = JSON.parse(sessionStorage.getItem('xr:reply') || 'null') } catch { saved = null }
+    if (!saved || !saved.tweet || Date.now() - saved.at > 120000) return
+    if (!/^\/compose/.test(location.pathname)) return
+    let tries = 0
+    const t = setInterval(() => {
+      tries += 1
+      const ed = findEditor()
+      if (ed) { clearInterval(t); showCandidatesFor(null, saved.tweet, saved.who || '') }
+      if (tries > 30) clearInterval(t)
+    }, 400)
+  })()
+
+  // 调试钩子：页面里派发 xr:learn 触发学习，结果写 html[data-xr-learn]
+  document.addEventListener('xr:learn', () => {
+    learnMyPosts()
+      .then((r) => { document.documentElement.dataset.xrLearn = JSON.stringify(r).slice(0, 800) })
+      .catch((e) => { document.documentElement.dataset.xrLearn = 'error:' + (e && e.message) })
+  })
+
   function toast(m) {
     let el = document.querySelector('.xr-toast')
     if (!el) { el = document.createElement('div'); el.className = 'xr-toast'; document.body.appendChild(el) }
