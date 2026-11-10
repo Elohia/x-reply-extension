@@ -43,6 +43,12 @@ function buildSystem() {
   lines.push('')
   lines.push('【绝对不要出现】' + S.avoid.join('、'))
   lines.push('')
+  lines.push('【先想清楚再写（防词不达意）】')
+  lines.push('1) 先用一句话说：他到底在问什么 / 在表达什么情绪 / 想要什么样的回应。')
+  lines.push('2) 再写三条：每条必须钉住推文里的**一个具体点**（一个词、一个数、一个动作），不能泛泛表态。')
+  lines.push('3) 如果推文在提问，三条里至少一条直接回答那个问题；如果推文在晒数据，先接住那个数据。')
+  lines.push('4) 写完自检：把三条分别放回推文下面读一遍，读起来接得上吗？接不上就重写。')
+  lines.push('')
   lines.push('【输出】只输出 JSON：')
   lines.push('{"analysis":"一句话：这条在说什么 + 作者想要什么反应","drafts":[{"angle":"' + S.angles[0].label + '","text":"…"},{"angle":"' + S.angles[1].label + '","text":"…"},{"angle":"' + S.angles[2].label + '","text":"…"}]}')
   return lines.join('\n')
@@ -70,7 +76,7 @@ function parseDrafts(raw) {
   return { analysis: String(data.analysis || '').trim(), drafts }
 }
 
-async function gen(tweet, author) {
+async function gen(tweet, author, quote) {
   const c = await cfg()
   if (!c.apiKey) return { ok: false, error: '没填 API Key（点插件图标 → 填 Key → 保存）' }
   const t0 = Date.now()
@@ -83,7 +89,7 @@ async function gen(tweet, author) {
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: buildSystem() },
-          { role: 'user', content: '推文：' + String(tweet || '').slice(0, 2000) + '\n作者：' + (author || '未知') + '\n我想要的语气：' + c.aiStyle },
+          { role: 'user', content: '推文：' + String(tweet || '').slice(0, 2000) + '\n作者：' + (author || '未知') + (quote ? '\n他引用/回复的内容：' + String(quote).slice(0, 800) : '') + '\n我想要的语气：' + c.aiStyle },
         ],
       }),
     })
@@ -100,6 +106,6 @@ async function gen(tweet, author) {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg && msg.type === 'ai:gen') { gen(msg.tweet, msg.author).then(sendResponse); return true }
+  if (msg && msg.type === 'ai:gen') { gen(msg.tweet, msg.author, msg.quote).then(sendResponse); return true }
   if (msg && msg.type === 'ai:test') { gen('测试：用 3 天把 120 万的表压到 8 秒', '@test').then(sendResponse); return true }
 })
