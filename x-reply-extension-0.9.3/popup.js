@@ -63,6 +63,17 @@ async function ensureInjected(tabId) {
   } catch (e) { return false }
 }
 
+function ping(tabId) {
+  return new Promise((resolve) => {
+    try {
+      chrome.tabs.sendMessage(tabId, { type: 'xr:ping' }, (res) => {
+        const err = chrome.runtime.lastError
+        resolve(err ? null : (res || null))
+      })
+    } catch (e) { resolve(null) }
+  })
+}
+
 function sendLearn(tabId) {
   return new Promise((resolve) => {
     try {
@@ -81,6 +92,15 @@ document.getElementById('learn')?.addEventListener('click', async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
   if (!tab || !/x\.com|twitter\.com/.test(tab.url || '')) { el.textContent = '先打开你自己的 X 主页再点'; return }
   try {
+    let p = await ping(tab.id)
+    if (!p) {
+      el.textContent = '注入最新脚本…'
+      await ensureInjected(tab.id)
+      await new Promise((r) => setTimeout(r, 500))
+      p = await ping(tab.id)
+    }
+    if (!p) return (el.textContent = '这个页面里脚本起不来（可能是 Chrome 商店页/PDF/x.com 之外的页面）：换到 x.com 你的主页再点')
+    el.textContent = '脚本 v' + (p.version || '?') + '，开始扫…'
     let res = await sendLearn(tab.id)
     if (!res) {
       el.textContent = '旧页面没响应，正在补注入最新脚本…'

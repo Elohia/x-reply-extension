@@ -8,6 +8,22 @@
  */
 (function () {
   'use strict'
+  if (window.__xrLoaded) return // 防止重复注入（popup 的补注入会和已注入的撞车）
+  window.__xrLoaded = true
+
+  // 监听器先挂上：后面任何初始化报错都不会导致 popup "没响应"
+  try {
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      if (!msg) return
+      if (msg.type === 'xr:ping') { sendResponse({ ok: true, version: chrome.runtime.getManifest().version, href: location.href }); return true }
+      if (msg.type === 'learn:status') { chrome.storage.local.get({ myCorpus: null }, (v) => sendResponse(v.myCorpus || null)); return true }
+      if (msg.type === 'learn:start') {
+        learnMyPosts().then(sendResponse).catch((e) => sendResponse({ ok: false, reason: '学习出错：' + (e && e.message) }))
+        return true
+      }
+    })
+  } catch (e) { /* 连监听都挂不上就没办法了 */ }
+
   const GEN = window.XReplyGen
   if (!GEN) return
   const DEFAULTS = { enabled: true, tone: 'direct', length: 'short', aiEnabled: false, autoOpen: true }
@@ -124,6 +140,13 @@
   }
 
   const textOf = (a) => { const el = a && a.querySelector('[data-testid="tweetText"]'); return el ? el.innerText.trim() : '' }
+  /** 引用转推 / 回复别人时，把被引用的那段也带上 */
+  const quotedOf = (a) => {
+    if (!a) return ''
+    const all = a.querySelectorAll('[data-testid="tweetText"]')
+    if (all.length < 2) return ''
+    return all[1].innerText.trim()
+  }
   const authorOf = (a) => { const el = a && a.querySelector('[data-testid="User-Name"]'); return el ? el.innerText.split('\n')[0].trim() : '' }
 
   function closePanel() { if (panel) { panel.remove(); panel = null } }
@@ -140,7 +163,7 @@
 
     if (!settings.aiEnabled) return
     const res = await new Promise((resolve) => {
-      try { chrome.runtime.sendMessage({ type: 'ai:gen', tweet, author: who }, resolve) } catch { resolve(null) }
+      try { chrome.runtime.sendMessage({ type: 'ai:gen', tweet, author: who, quote: quotedOf(art) }, resolve) } catch { resolve(null) }
     })
     if (!res || !res.ok || !bar) return
     ctx = { art, drafts: res.drafts, meta: 'AI · ' + res.model + ' · ' + res.ms + 'ms', analysis: res.analysis }
@@ -248,7 +271,7 @@
     }
 
     try {
-      chrome.runtime.sendMessage({ type: 'ai:gen', tweet, author: who }, (res) => {
+      chrome.runtime.sendMessage({ type: 'ai:gen', tweet, author: who, quote: quotedOf(art) }, (res) => {
         if (chrome.runtime.lastError) return finish(null)
         finish(res)
       })
@@ -309,27 +332,21 @@
     const cnt = () => String(ed.textContent || '').split(t).length - 1
     if (cnt() >= 1) return true
 
-    // 先清空再写：实测「清空 + 折叠光标 + execCommand」只写一份；
-    // 直接插到已有内容后面，X 的编辑器会把同一段应用两次。
     ed.focus()
+    // 先清空：X 编辑器有残留时会把同一段应用两次
     try { document.execCommand('selectAll') } catch { /* 忽略 */ }
     try { document.execCommand('delete') } catch { /* 忽略 */ }
-
-    const sel = window.getSelection()
-    const r = document.createRange()
-    r.selectNodeContents(ed)
-    r.collapse(false)
-    sel.removeAllRanges()
-    sel.addRange(r)
-
+    caretEnd(ed)
     try { document.execCommand('insertText', false, t) } catch { /* 忽略 */ }
-    if (cnt() === 1) return true
-    if (cnt() > 1) {
-      // 还是两份：全选后整体替换成一份
-      ed.focus()
-      try { document.execCommand('selectAll') } catch { /* 忽略 */ }
-      try { document.execCommand('insertText', false, t) } catch { /* 忽略 */ }
-    }
+
+    // 关键一步：补发 input 事件，让 X 的编辑器把 DOM 里的文字同步进自己的 state。
+    // 少了这步，字看得见、但光标点进去打不上字（"不能自己修改"就是它）。
+    try {
+      ed.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: false, inputType: 'insertText', data: t }))
+    } catch { /* 忽略 */ }
+
+    // 光标落到末尾，用户可以直接接着改
+    caretEnd(ed)
     return cnt() >= 1
   }
 
