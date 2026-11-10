@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>X 快速回复 · 离线试写</title>
+<style>
+  body { max-width: 760px; margin: 32px auto; padding: 0 16px; font: 14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #15202b; color: #e7e9ea; }
+  h1 { font-size: 18px; }
+  textarea { width: 100%; box-sizing: border-box; min-height: 90px; background: #0f1720; color: #e7e9ea; border: 1px solid #38444d; border-radius: 10px; padding: 10px; font: inherit; }
+  button { margin-top: 8px; background: #1d9bf0; color: #fff; border: 0; border-radius: 999px; padding: 8px 16px; font: inherit; cursor: pointer; }
+  .item { border: 1px solid #2f3b47; border-radius: 10px; padding: 10px; margin: 10px 0; }
+  .angle { font-size: 12px; color: #7bb8ea; }
+  .warn { font-size: 12px; color: #f7b267; }
+  .ok { font-size: 12px; color: #6cc070; }
+</style>
+</head>
+<body>
+  <h1>离线试写</h1>
+  <p style="opacity:.7">贴一条推文正文，看看会生成什么草稿（不联网、不碰账号）。</p>
+  <textarea id="in">用 3 天把 120 万的表压到 8 秒，说说我怎么做的</textarea>
+  <button id="go">生成</button>
+  <div id="out"></div>
+  <script src="src/gen.js"></script>
+  <script>
+    document.getElementById('go').addEventListener('click', () => {
+      const text = document.getElementById('in').value
+      const out = document.getElementById('out')
+      out.innerHTML = ''
+      for (const d of XReplyGen.drafts({ text }, {})) {
+        const r = XReplyGen.check(d.text)
+        const div = document.createElement('div')
+        div.className = 'item'
+        div.innerHTML = '<div class="angle"></div><div class="body"></div><div class="' + (r.ok ? 'ok' : 'warn') + '"></div>'
+        div.querySelector('.angle').textContent = d.angle
+        div.querySelector('.body').textContent = d.text
+        div.querySelector(r.ok ? '.ok' : '.warn').textContent = r.ok ? '这条可以直接用' : r.issues.join('；')
+        out.appendChild(div)
+      }
+    })
+  </script>
+</body>
+</html>

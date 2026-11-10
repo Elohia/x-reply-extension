@@ -65,7 +65,13 @@ async function ensureInjected(tabId) {
 
 function sendLearn(tabId) {
   return new Promise((resolve) => {
-    chrome.tabs.sendMessage(tabId, { type: 'learn:start' }, (res) => resolve(res))
+    try {
+      chrome.tabs.sendMessage(tabId, { type: 'learn:start' }, (res) => {
+        const err = chrome.runtime.lastError // 必须读一下，否则控制台报 Unchecked runtime.lastError
+        if (err) return resolve(null)
+        resolve(res || null)
+      })
+    } catch (e) { resolve(null) }
   })
 }
 
@@ -79,7 +85,7 @@ document.getElementById('learn')?.addEventListener('click', async () => {
     if (!res) {
       el.textContent = '旧页面没响应，正在补注入最新脚本…'
       const ok = await ensureInjected(tab.id)
-      if (!ok) return (el.textContent = '补注入失败：这个页面可能不是 x.com，或权限被拒（重载扩展一次）')
+      if (!ok) return (el.textContent = '当前扩展版本太旧（无 scripting 权限）：到 chrome://extensions 点「刷新」升级到 0.9.2 后再试')
       await new Promise((r) => setTimeout(r, 600))
       res = await sendLearn(tab.id)
     }
