@@ -113,4 +113,10 @@ document.getElementById('learn')?.addEventListener('click', async () => {
   } catch (e) { el.textContent = '失败：' + e.message }
 })
 
-document.getElementById('openOptions')?.addEventListener('click', () => chrome.runtime.openOptionsPage())
+document.getElementById('openOptions')?.addEventListener('click', (e) => {
+  // 链接本身能开；这里只是兜底（某些版本 openOptionsPage 会静默失败）
+  try {
+    e.preventDefault()
+    chrome.tabs.create({ url: chrome.runtime.getURL('options.html') })
+  } catch (err) { /* 让链接默认行为生效 */ }
+})
