@@ -312,20 +312,35 @@
     foot.append(again, tip); body.appendChild(foot)
   }
 
-  function isPageComposer(e) {
-    // 首页顶部"有什么新鲜事"的发帖框：aria-label 是"帖子文本"，别拿它当回复框
-    const label = e.getAttribute('aria-label') || ''
-    return label === '帖子文本' || label === 'Post text'
-  }
+  /** 找当前该用的编辑器：优先正在聚焦的 → 弹窗里的 → 离"你点的那条推文"最近的
+   *  注意：X 的回复框和首页发帖框 aria-label 都是「帖子文本」，不能用 label 区分。 */
   function findEditor() {
     const vis = (e) => e && e.offsetParent !== null
-    const ok = (e) => e && vis(e) && !isPageComposer(e)
+    const isEd = (e) => e && e.getAttribute && e.getAttribute('contenteditable') === 'true' && (e.getAttribute('data-testid') || '').startsWith('tweetTextarea_')
+
     const ae = document.activeElement
-    if (ae && ae.getAttribute && ae.getAttribute('contenteditable') === 'true' && ok(ae) && (ae.getAttribute('data-testid') || '').startsWith('tweetTextarea_')) return ae
-    const inDialog = Array.from(document.querySelectorAll('[role="dialog"] [data-testid="tweetTextarea_0"]')).filter(vis)
+    if (isEd(ae) && vis(ae)) return ae
+
+    const inDialog = Array.from(document.querySelectorAll('[role="dialog"] [data-testid="tweetTextarea_0"]')).filter(isEd).filter(vis)
     if (inDialog.length) return inDialog[inDialog.length - 1]
-    const all = Array.from(document.querySelectorAll('[data-testid="tweetTextarea_0"]')).filter(ok)
-    return all.length ? all[all.length - 1] : null
+
+    const all = Array.from(document.querySelectorAll('[data-testid="tweetTextarea_0"]')).filter(isEd).filter(vis)
+    if (!all.length) return null
+
+    const ref = replyTarget && replyTarget.isConnected ? replyTarget : null
+    if (ref) {
+      const rr = ref.getBoundingClientRect()
+      const cy = rr.top + rr.height / 2
+      let best = null
+      let bestD = Infinity
+      for (const e of all) {
+        const r = e.getBoundingClientRect()
+        const d = Math.abs((r.top + r.height / 2) - cy)
+        if (d < bestD) { bestD = d; best = e }
+      }
+      return best || all[all.length - 1]
+    }
+    return all[all.length - 1]
   }
 
   function insertText(ed, t) {
