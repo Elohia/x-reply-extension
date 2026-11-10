@@ -12,6 +12,9 @@
   window.__xrLoaded = true
 
   // 监听器先挂上：后面任何初始化报错都不会导致 popup "没响应"
+  // 版本标记：方便外部（MCP/调试）确认浏览器里跑的是哪一版
+  try { document.documentElement.setAttribute('data-xr-version', chrome.runtime.getManifest().version) } catch { /* 忽略 */ }
+
   try {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (!msg) return
