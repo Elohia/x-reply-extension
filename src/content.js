@@ -28,8 +28,10 @@
   } catch (e) { /* 连监听都挂不上就没办法了 */ }
 
   const GEN = window.XReplyGen
+  const I18N = window.XReplyI18n || { t: (k) => k, angleLabel: (a) => a }
+  const T = (k) => I18N.t(k, settings.uiLang)
   if (!GEN) return
-  const DEFAULTS = { enabled: true, tone: 'direct', length: 'short', aiEnabled: false, autoOpen: true }
+  const DEFAULTS = { enabled: true, tone: 'direct', length: 'short', aiEnabled: false, autoOpen: true, replyLang: 'auto', uiLang: 'auto' }
   let settings = { ...DEFAULTS }
   let panel = null
   let launcher = null
@@ -84,7 +86,7 @@
     launcher = document.createElement('button')
     launcher.id = 'xr-launcher'
     launcher.type = 'button'
-    launcher.title = '快速回复（Alt+R）｜可拖动'
+    launcher.title = T('launcherTitle')
     launcher.innerHTML =
       '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">' +
       '<path fill="currentColor" d="M4 3.5h16a2.5 2.5 0 0 1 2.5 2.5v9A2.5 2.5 0 0 1 20 17.5H10.2l-4.1 3.2c-.7.5-1.6 0-1.6-.8v-2.4H4A2.5 2.5 0 0 1 1.5 15V6A2.5 2.5 0 0 1 4 3.5Z"/>' +
@@ -157,7 +159,7 @@
   /** 点推文「回复」后：生成三条 → 贴在回复框上方（不遮挡输入） */
   async function showCandidatesFor(art, tweet, who) {
     if (panel) closePanel()
-    const local = GEN.drafts({ text: tweet }, { tone: settings.tone, length: settings.length })
+    const local = GEN.drafts({ text: tweet }, { tone: settings.tone, length: settings.length, lang: settings.replyLang })
     ctx = { art, drafts: local, meta: '本地模板', analysis: '' }
     let ed = null
     for (let i = 0; i < 30 && !ed; i++) { await new Promise((r) => setTimeout(r, 150)); ed = findEditor() }
@@ -178,16 +180,16 @@
     closePanel()
     const art = ctxIn ? ctxIn.art : currentTweet()
     const tweet = ctxIn ? ctxIn.tweet : textOf(art)
-    if (!tweet) return toast('没找到推文：把页面滚到那条推文上再点')
+    if (!tweet) return toast(T('noTweet'))
     const who = ctxIn ? ctxIn.who : authorOf(art)
 
     panel = document.createElement('div')
     panel.className = 'xr-panel'
     const head = document.createElement('header')
-    const b = document.createElement('b'); b.textContent = '快速回复'
+    const b = document.createElement('b'); b.textContent = T('panelTitle')
     const isReplying = replyTarget === art
     const sub = document.createElement('span'); sub.style.cssText = 'opacity:.6;font-size:11px'
-    sub.textContent = (isReplying ? '回复 ' : '') + who
+    sub.textContent = (isReplying ? T('replying') + ' ' : '') + who
     const collapse = document.createElement('button'); collapse.className = 'xr-close'; collapse.type = 'button'; collapse.textContent = '—'; collapse.title = '收起'
     collapse.addEventListener('click', () => { panel.classList.toggle('xr-collapsed'); placePanel() })
     const close = document.createElement('button'); close.className = 'xr-close'; close.type = 'button'; close.textContent = '✕'
@@ -244,7 +246,7 @@
   function render(body, art, tweet, who) {
     body.innerHTML = ''
     // ① 先立刻给三条本地草稿：永远不出现"空面板"
-    const local = GEN.drafts({ text: tweet }, { tone: settings.tone, length: settings.length })
+    const local = GEN.drafts({ text: tweet }, { tone: settings.tone, length: settings.length, lang: settings.replyLang })
     ctx = { art, drafts: local, meta: '本地模板', analysis: '' }
     items(body, local, { notice: '本地模板（等 AI 时可以先看这个）', regen: () => render(body, art, tweet, who) })
 
@@ -253,19 +255,19 @@
     // ② 再异步换成 AI 版本；失败就保留本地，并把原因写在顶部
     const strip = document.createElement('div')
     strip.className = 'xr-loading'
-    strip.textContent = 'AI 正在读这条…'
+    strip.textContent = T('aiReading')
     body.prepend(strip)
     let done = false
     const timer = setTimeout(() => {
       if (done) return
-      strip.textContent = 'AI 超时（>9s），先用本地模板；点「换一批」可重试'
+      strip.textContent = T('aiTimeout')
     }, 9000)
 
     const finish = (res) => {
       done = true
       clearTimeout(timer)
       if (!res || !res.ok) {
-        strip.textContent = 'AI 不可用：' + ((res && res.error) || '后台没响应') + '（已用本地模板）'
+        strip.textContent = T('aiFail') + ': ' + ((res && res.error) || '-')
         return
       }
       strip.remove()
@@ -295,21 +297,21 @@
     if (o.analysis) { const d = document.createElement('div'); d.className = 'xr-analysis'; d.textContent = o.analysis; body.appendChild(d) }
     for (const it of drafts) {
       const box = document.createElement('div'); box.className = 'xr-item'
-      const ang = document.createElement('div'); ang.className = 'xr-angle'; ang.textContent = it.angle
+      const ang = document.createElement('div'); ang.className = 'xr-angle'; ang.textContent = I18N.angleLabel(it.angle, settings.uiLang)
       const ta = document.createElement('textarea'); ta.value = it.text
       const warn = document.createElement('div'); warn.className = 'xr-warn'
       const chk = () => { const r = GEN.check(ta.value); warn.textContent = r.ok ? '' : r.issues.join('；'); warn.style.display = r.ok ? 'none' : 'block' }
       ta.addEventListener('input', chk); chk()
       const acts = document.createElement('div'); acts.className = 'xr-actions'
-      const fill = document.createElement('button'); fill.className = 'primary'; fill.type = 'button'; fill.textContent = '填入回复框'
+      const fill = document.createElement('button'); fill.className = 'primary'; fill.type = 'button'; fill.textContent = T('fill')
       fill.addEventListener('click', () => fillReply(ctx && ctx.art, ta.value))
-      const copy = document.createElement('button'); copy.type = 'button'; copy.textContent = '复制'
-      copy.addEventListener('click', async () => { try { await navigator.clipboard.writeText(ta.value); toast('已复制') } catch { toast('复制失败') } })
+      const copy = document.createElement('button'); copy.type = 'button'; copy.textContent = T('copy')
+      copy.addEventListener('click', async () => { try { await navigator.clipboard.writeText(ta.value); toast(T('copied')) } catch { toast(T('copyFail')) } })
       acts.append(fill, copy)
       box.append(ang, ta, warn, acts); body.appendChild(box)
     }
     const foot = document.createElement('div'); foot.className = 'xr-foot'
-    const again = document.createElement('button'); again.type = 'button'; again.textContent = '换一批'
+    const again = document.createElement('button'); again.type = 'button'; again.textContent = T('regen')
     again.addEventListener('click', () => o.regen && o.regen())
     const tip = document.createElement('span'); tip.textContent = o.meta || o.notice || ''
     foot.append(again, tip); body.appendChild(foot)
@@ -387,11 +389,11 @@
       if (btn) btn.click()
       for (let i = 0; i < 30 && !ed; i++) { await new Promise((r) => setTimeout(r, 150)); ed = findEditor() }
     }
-    if (!ed) return toast('没找到回复框：手动点一下「回复」再试')
+    if (!ed) return toast(T('noEditor'))
     insertText(ed, t)
     chrome.storage.local.get({ used: 0 }, (v) => chrome.storage.local.set({ used: (v.used || 0) + 1 }))
     showBar(ed)
-    toast('已填入，确认后自己发')
+    toast(T('inserted'))
   }
 
   /* 候选条：只在"我们刚填过"之后出现，靠定时器定位，不监听 DOM */
@@ -404,7 +406,7 @@
     label.textContent = (replyTarget ? '回复 ' + authorOf(replyTarget) + ' · ' : '') + (ctx.meta || '候选')
     const wrap = document.createElement('div'); wrap.className = 'xr-bar-chips'
     for (const d of ctx.drafts.slice(0, 3)) {
-      const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'xr-chip'; chip.textContent = d.angle; chip.title = d.text
+      const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'xr-chip'; chip.textContent = I18N.angleLabel(d.angle, settings.uiLang); chip.title = d.text
       chip.addEventListener('click', () => {
         const now = findEditor(); if (!now) return
         now.focus(); document.execCommand('selectAll'); document.execCommand('delete'); insertText(now, d.text)

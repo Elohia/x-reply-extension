@@ -112,3 +112,5 @@ document.getElementById('learn')?.addEventListener('click', async () => {
     chrome.storage.local.get({ myCorpus: null }, (v) => showCorpus(v.myCorpus))
   } catch (e) { el.textContent = '失败：' + e.message }
 })
+
+document.getElementById('openOptions')?.addEventListener('click', () => chrome.runtime.openOptionsPage())

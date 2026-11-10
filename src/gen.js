@@ -12,10 +12,10 @@
   const clean = (t) => String(t || '').replace(/https?:\/\/\S+/g, ' ').replace(/\s+/g, ' ').trim()
   const nums = (t) => (clean(t).match(/\d+(?:\.\d+)?\s*(?:%|万|亿|千|k|K|天|个月|年|次|条|人|个|美元|块|元)?/g) || []).filter((x) => x.length >= 2).slice(0, 3)
   const topic = (t) => {
-    if (/(代码|插件|脚本|API|部署|报错|调试|模型|prompt|GitHub|编译|依赖|MCP)/i.test(t)) return 'tech'
-    if (/\d+\s*(%|万|亿)|转化|留存|曝光|播放|成本|营收|ROI|数据|流量/.test(t)) return 'data'
-    if (/(粉丝|曝光|流量|涨粉|互动|播放|阅读|推荐)/.test(t)) return 'growth'
-    if (/(上线|发布|产品|小程序|游戏|功能|用户|注册|下载|版本)/.test(t)) return 'product'
+    if (/(代码|插件|脚本|API|部署|报错|调试|模型|prompt|GitHub|编译|依赖|MCP|deploy|debug|error|stack|repo|compile|dependency|model)/i.test(t)) return 'tech'
+    if (/\d+\s*(%|万|亿)|转化|留存|曝光|播放|成本|营收|ROI|数据|流量|conversion|retention|impression|revenue|cost|traffic|MRR/i.test(t)) return 'data'
+    if (/(粉丝|曝光|流量|涨粉|互动|播放|阅读|推荐|followers|growth|audience|reach|engagement)/i.test(t)) return 'growth'
+    if (/(上线|发布|产品|小程序|游戏|功能|用户|注册|下载|版本|ship|launch|product|feature|users|signup|release)/i.test(t)) return 'product'
     return 'view'
   }
   // 用推文文本做稳定散列，保证同一推文每次生成一致，不同推文不撞句
@@ -50,21 +50,59 @@
     },
   }
 
+  const POOL_EN = {
+    tech: {
+      add: ['The environment bites harder than the code. Did it break on the same machine?', 'This works until you need to roll back. Do you have a downgrade path?', 'I hit the same wall last week — it was a dependency version.'],
+      push: ['Half true. On my side the same approach died at higher concurrency, not at small scale.', 'The catch: memory goes first, not logic, once volume climbs.', 'Works for a demo, not for prod. Did you load test it?'],
+      stop: ['Ship it first, polish later.', 'This is grunt work, not genius work.'],
+    },
+    data: {
+      add: ['What is the denominator here — impressions or clicks?', 'Nice number, but over what window? A week and a month are different stories.', 'Single-day spikes lie. Is this a multi-day average?'],
+      push: ['Change the denominator and it flips: same thing measured by impressions goes negative for me.', 'Survivorship bias — the ones that failed are not in this chart.', 'Looks great short term, then it regressed for me after a couple weeks.'],
+      stop: ['Define the metric before comparing.', 'No baseline, no comparison.'],
+    },
+    growth: {
+      add: ['I hit the same ceiling. Changing posting time moved it more than changing content.', 'Spending three days in replies beat posting ten more times for me.', 'Watch the median per post, not the total.'],
+      push: ['Probably not the content: the same post at a different hour tripled for me.', 'Could be engagement rate, not the algorithm.', 'Chasing trends gets views, not followers.'],
+      stop: ['Consistency first, virality later.', 'Watch replies, not impressions.'],
+    },
+    product: {
+      add: ['Shipping is day one. Distribution is the hard part — where did your first users come from?', 'The feature works, but it is buried three clicks deep.', 'Copy changes moved more for me than feature changes.'],
+      push: ['Not always. Mine shipped to silence for three weeks until notifications.', 'Old users will push back on any redesign. Plan the migration.', 'Only matters if someone pays for it.'],
+      stop: ['No one knows it exists — that is the usual death.', 'Get someone using it before making it good.'],
+    },
+    view: {
+      add: ['I agree halfway: at larger scale this stops holding.', 'The hard part is staying long enough to find out.', 'When did you start thinking this?'],
+      push: ['Flip it: if this were false, who eats the loss first?', 'True, assuming luck holds.', 'Sounds right, and most people die on step two.'],
+      stop: ['Right direction — do not scale yet.', 'Start small, then decide.'],
+    },
+  }
+
+  const detectLang = (t) => {
+    if (/[\u3040-\u30ff]/.test(t)) return 'ja'
+    if (/[\uac00-\ud7af]/.test(t)) return 'ko'
+    if (/[\u4e00-\u9fff]/.test(t)) return 'zh'
+    return 'en'
+  }
+
   function drafts(tweet, opts) {
     const text = clean(tweet && tweet.text)
     if (!text) return []
     const k = topic(text)
     const seed = hash(text)
     const n = nums(text)
-    const pool = POOL[k]
-    const withNum = (s) => (n[0] ? s.replace('你那边', n[0]) : s)
-    const len = opts && opts.length === 'mid' ? 95 : 62
+    const lang = (opts && opts.lang && opts.lang !== 'auto') ? opts.lang : detectLang(text)
+    const en = lang !== 'zh'
+    const pool = en ? POOL_EN[k] : POOL[k]
+    const withNum = (s) => (n[0] ? s.replace('【你的数字】', n[0]) : s)
+    const len = opts && opts.length === 'mid' ? (en ? 210 : 95) : (en ? 130 : 62)
+    const angles = en ? ['Follow up', 'Push back', 'One-liner'] : ['接一句', '顶一句', '收一句']
     const out = [
-      { angle: '接一句', text: withNum(pick(pool.add, seed, 0)) },
-      { angle: '顶一句', text: withNum(pick(pool.push, seed, 1)) },
-      { angle: '收一句', text: pick(pool.stop, seed, 2) },
+      { angle: angles[0], text: withNum(pick(pool.add, seed, 0)) },
+      { angle: angles[1], text: withNum(pick(pool.push, seed, 1)) },
+      { angle: angles[2], text: pick(pool.stop, seed, 2) },
     ]
-    const noPlaceholder = (x) => x.replace(/【[^】]*】/g, '你那边')
+    const noPlaceholder = (x) => x.replace(/【[^】]*】/g, en ? 'some' : '你那边')
     return out.map((d) => {
       let t = noPlaceholder(strip(d.text)).replace(/\s+/g, ' ').trim()
       if (t.length > len) t = t.slice(0, len - 1) + '…'
@@ -86,5 +124,5 @@
     return { ok: issues.length === 0, issues }
   }
 
-  return { drafts, check, topic }
+  return { drafts, check, topic, detectLang }
 })

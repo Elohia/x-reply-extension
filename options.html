@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>X 快速回复 · 设置</title>
+<style>
+  :root { color-scheme: dark }
+  body { margin:0; background:#15202b; color:#e7e9ea; font:14px/1.6 system-ui,"Microsoft YaHei",sans-serif }
+  .wrap { max-width:720px; margin:0 auto; padding:28px 20px 60px }
+  h1 { font-size:19px; margin:0 0 4px }
+  .sub { color:#8b98a5; font-size:12px; margin-bottom:22px }
+  section { background:#1c2733; border:1px solid #2f3b47; border-radius:12px; padding:16px 18px; margin-bottom:14px }
+  section h2 { font-size:13px; color:#8b98a5; font-weight:600; margin:0 0 12px; letter-spacing:.04em }
+  label.row { display:flex; align-items:center; gap:12px; margin:10px 0 }
+  label.row > span:first-child { width:132px; color:#c7d0d9; flex:none }
+  input[type=text], input[type=password], select, textarea {
+    flex:1; background:#10181f; color:#e7e9ea; border:1px solid #38444d; border-radius:8px; padding:8px 10px; font:inherit; min-width:0
+  }
+  textarea { min-height:110px; resize:vertical; line-height:1.5 }
+  .note { color:#8b98a5; font-size:12px; margin:6px 0 0 144px }
+  .note.flush { margin-left:0 }
+  button { background:#1d9bf0; color:#fff; border:0; border-radius:999px; padding:8px 16px; font:600 13px/1 inherit; cursor:pointer }
+  button.ghost { background:transparent; border:1px solid #38444d; color:#c7d0d9 }
+  button:disabled { opacity:.5; cursor:default }
+  .btns { display:flex; gap:10px; align-items:center; flex-wrap:wrap }
+  .kv { color:#8b98a5; font-size:12px }
+  #status { min-height:20px; color:#8fc7a8 }
+  #status.bad { color:#f1919a }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>X 快速回复 · 设置</h1>
+  <div class="sub">全部保存在本机；API Key 只存在 chrome.storage.local</div>
+
+  <section>
+    <h2>AI 生成</h2>
+    <label class="row"><span>启用 AI</span><input type="checkbox" id="aiEnabled" style="flex:none"></label>
+    <label class="row"><span>API Key</span><input type="password" id="apiKey" placeholder="sk-..."></label>
+    <label class="row"><span>Base URL</span><input type="text" id="apiBase" placeholder="https://api.deepseek.com"></label>
+    <label class="row"><span>模型</span><input type="text" id="model" placeholder="deepseek-chat"></label>
+    <div class="btns" style="margin-left:144px"><button id="test">测试连接</button><span class="kv" id="testMsg"></span></div>
+  </section>
+
+  <section>
+    <h2>固定提示词（每次生成都会带上）</h2>
+    <textarea id="customSystem" placeholder="例如：永远用第一人称；不要吹捧；可以用「其实」「反过来」；别提 AI；结尾不加反问。"></textarea>
+    <div class="note flush">写在这里的要求会作为「我的固定要求」附在系统提示词末尾，优先级高于默认风格。</div>
+  </section>
+
+  <section>
+    <h2>回复</h2>
+    <label class="row"><span>回复语言</span>
+      <select id="replyLang">
+        <option value="auto">跟随推文（推文英文就回英文）</option>
+        <option value="zh">中文</option>
+        <option value="en">English</option>
+        <option value="ja">日本語</option>
+        <option value="ko">한국어</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="de">Deutsch</option>
+      </select>
+    </label>
+    <label class="row"><span>语气</span>
+      <select id="tone">
+        <option value="direct">直接给判断</option>
+        <option value="warm">温和接话</option>
+        <option value="sharp">尖锐一点</option>
+      </select>
+    </label>
+    <label class="row"><span>长度</span>
+      <select id="length">
+        <option value="short">短（≤35 字）</option>
+        <option value="mid">中（40–70 字）</option>
+      </select>
+    </label>
+    <label class="row"><span>点回复自动弹</span><input type="checkbox" id="autoOpen" style="flex:none"></label>
+  </section>
+
+  <section>
+    <h2>界面</h2>
+    <label class="row"><span>界面语言</span>
+      <select id="uiLang">
+        <option value="auto">跟随浏览器</option>
+        <option value="zh">中文</option>
+        <option value="en">English</option>
+      </select>
+    </label>
+    <label class="row"><span>启用插件</span><input type="checkbox" id="enabled" style="flex:none"></label>
+  </section>
+
+  <section>
+    <h2>我的语料（学你自己的语气）</h2>
+    <div class="btns"><button id="learn">学习我的推文</button><button id="clearCorpus" class="ghost">清除语料</button></div>
+    <div class="note flush" id="corpus">未学习</div>
+    <div class="note flush">需要当前标签页是你自己的 X 主页；会向下滚动抓 40–80 条。</div>
+  </section>
+
+  <section>
+    <h2>关于</h2>
+    <div class="kv">版本 <b id="ver">-</b> · 更新方式：每 5 分钟比对 GitHub，发现新版本自动重载（无需手动刷新）</div>
+    <div class="btns" style="margin-top:10px"><button id="check" class="ghost">立即检查更新</button><span class="kv" id="updMsg"></span></div>
+  </section>
+
+  <div id="status"></div>
+</div>
+<script src="options.js"></script>
+</body>
+</html>

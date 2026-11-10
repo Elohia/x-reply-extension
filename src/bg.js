@@ -25,6 +25,7 @@ function newer(a, b) {
 }
 
 let lastCheck = 0
+let lastRemote = null
 async function checkSelfUpdate(force) {
   if (!force && Date.now() - lastCheck < 60000) return
   lastCheck = Date.now()
@@ -32,11 +33,13 @@ async function checkSelfUpdate(force) {
     const res = await fetch(VERSION_URL, { cache: 'no-store' })
     if (!res.ok) return
     const remote = (await res.json()).version
+    lastRemote = remote
     const local = chrome.runtime.getManifest().version
     if (newer(remote, local)) {
       console.log('[xr] 发现新版本 ' + remote + '（当前 ' + local + '），自动重载')
       chrome.runtime.reload()
     }
+    return remote
   } catch (e) { /* 离线就算了 */ }
 }
 
@@ -51,7 +54,9 @@ try {
 const DEFAULTS = { aiEnabled: false, apiBase: 'https://api.deepseek.com', model: 'deepseek-chat', aiStyle: 'direct' }
 const S = self.XReplyStyle
 
-function buildSystem(corpus) {
+const LANG_NAME = { zh: '中文', en: 'English', ja: '日本語', ko: '한국어', es: 'Español', fr: 'Français', de: 'Deutsch' }
+
+function buildSystem(corpus, cfg) {
   const lines = []
   lines.push('你在帮一个中文 X 用户写**一条**回复。只写这一条的三个候选，供他挑一个改完发出去。')
   lines.push('')
@@ -83,6 +88,16 @@ function buildSystem(corpus) {
   S.examples.slice(0, 10).forEach((e) => lines.push('- ' + e))
   lines.push('')
   lines.push('【绝对不要出现】' + S.avoid.join('、'))
+  const lang = cfg && cfg.replyLang ? cfg.replyLang : 'auto'
+  if (lang === 'auto') lines.push('【语言】用与推文相同的语言回复：推文是英文就写英文，是日文就写日文，中文就写中文。不要翻译成别的语言。')
+  else lines.push('【语言】用' + (LANG_NAME[lang] || lang) + '回复，不要用其他语言。')
+  // 用户自己写的固定要求，优先级最高
+  const custom = cfg && cfg.customSystem ? String(cfg.customSystem).slice(0, 2000) : ''
+  if (custom) {
+    lines.push('')
+    lines.push('【我的固定要求（最高优先级，必须遵守）】')
+    lines.push(custom)
+  }
   if (corpus && corpus.examples && corpus.examples.length) {
     lines.push('')
     lines.push('【我平时就是这么写的（来自我自己的推文，语气要对齐这个，但不要抄）】')
@@ -136,7 +151,7 @@ async function gen(tweet, author, quote) {
         model: c.model, temperature: 0.65, max_tokens: 700,
         response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: buildSystem(c.myCorpus) },
+          { role: 'system', content: buildSystem(c.myCorpus, c) },
           { role: 'user', content: '推文：' + String(tweet || '').slice(0, 2000) + '\n作者：' + (author || '未知') + (quote ? '\n他引用/回复的内容：' + String(quote).slice(0, 800) : '') + '\n我想要的语气：' + c.aiStyle },
         ],
       }),
@@ -155,5 +170,11 @@ async function gen(tweet, author, quote) {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.type === 'ai:gen') { checkSelfUpdate(); gen(msg.tweet, msg.author, msg.quote).then(sendResponse); return true }
+  if (msg && msg.type === 'xr:checkUpdate') {
+    checkSelfUpdate(true)
+      .then((remote) => sendResponse({ ok: true, local: chrome.runtime.getManifest().version, remote: remote || null }))
+      .catch(() => sendResponse({ ok: false }))
+    return true
+  }
   if (msg && msg.type === 'ai:test') { checkSelfUpdate(); gen('测试：用 3 天把 120 万的表压到 8 秒', '@test').then(sendResponse); return true }
 })
