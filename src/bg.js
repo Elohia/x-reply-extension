@@ -24,7 +24,10 @@ function newer(a, b) {
   return false
 }
 
-async function checkSelfUpdate() {
+let lastCheck = 0
+async function checkSelfUpdate(force) {
+  if (!force && Date.now() - lastCheck < 60000) return
+  lastCheck = Date.now()
   try {
     const res = await fetch(VERSION_URL, { cache: 'no-store' })
     if (!res.ok) return
@@ -151,6 +154,6 @@ async function gen(tweet, author, quote) {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg && msg.type === 'ai:gen') { gen(msg.tweet, msg.author, msg.quote).then(sendResponse); return true }
-  if (msg && msg.type === 'ai:test') { gen('测试：用 3 天把 120 万的表压到 8 秒', '@test').then(sendResponse); return true }
+  if (msg && msg.type === 'ai:gen') { checkSelfUpdate(); gen(msg.tweet, msg.author, msg.quote).then(sendResponse); return true }
+  if (msg && msg.type === 'ai:test') { checkSelfUpdate(); gen('测试：用 3 天把 120 万的表压到 8 秒', '@test').then(sendResponse); return true }
 })

@@ -329,24 +329,23 @@
   }
 
   function insertText(ed, t) {
+    // 0.7 的写法：光标放到末尾 → execCommand 插入 → 只在重复时纠正。
+    // 不再"先清空"、也不再补发 input 事件：那两步会把 X 编辑器的内部状态弄坏，
+    // 表现就是字填进去了、但之后连手动打字都写不进去。
     const cnt = () => String(ed.textContent || '').split(t).length - 1
     if (cnt() >= 1) return true
 
     ed.focus()
-    // 先清空：X 编辑器有残留时会把同一段应用两次
-    try { document.execCommand('selectAll') } catch { /* 忽略 */ }
-    try { document.execCommand('delete') } catch { /* 忽略 */ }
     caretEnd(ed)
     try { document.execCommand('insertText', false, t) } catch { /* 忽略 */ }
 
-    // 关键一步：补发 input 事件，让 X 的编辑器把 DOM 里的文字同步进自己的 state。
-    // 少了这步，字看得见、但光标点进去打不上字（"不能自己修改"就是它）。
-    try {
-      ed.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: false, inputType: 'insertText', data: t }))
-    } catch { /* 忽略 */ }
-
-    // 光标落到末尾，用户可以直接接着改
-    caretEnd(ed)
+    if (cnt() >= 2) {
+      // 极少数情况 X 会应用两次：全选后整体替换成一份
+      ed.focus()
+      try { document.execCommand('selectAll') } catch { /* 忽略 */ }
+      try { document.execCommand('insertText', false, t) } catch { /* 忽略 */ }
+      caretEnd(ed)
+    }
     return cnt() >= 1
   }
 
