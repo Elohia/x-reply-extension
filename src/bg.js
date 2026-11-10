@@ -85,7 +85,7 @@ async function gen(tweet, author, quote) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + c.apiKey },
       body: JSON.stringify({
-        model: c.model, temperature: 0.8, max_tokens: 600,
+        model: c.model, temperature: 0.65, max_tokens: 700,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: buildSystem() },
