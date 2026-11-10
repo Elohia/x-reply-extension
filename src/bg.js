@@ -10,7 +10,7 @@ importScripts('reply-style.js')
 const DEFAULTS = { aiEnabled: false, apiBase: 'https://api.deepseek.com', model: 'deepseek-chat', aiStyle: 'direct' }
 const S = self.XReplyStyle
 
-function buildSystem() {
+function buildSystem(corpus) {
   const lines = []
   lines.push('你在帮一个中文 X 用户写**一条**回复。只写这一条的三个候选，供他挑一个改完发出去。')
   lines.push('')
@@ -42,6 +42,13 @@ function buildSystem() {
   S.examples.slice(0, 10).forEach((e) => lines.push('- ' + e))
   lines.push('')
   lines.push('【绝对不要出现】' + S.avoid.join('、'))
+  if (corpus && corpus.examples && corpus.examples.length) {
+    lines.push('')
+    lines.push('【我平时就是这么写的（来自我自己的推文，语气要对齐这个，但不要抄）】')
+    lines.push('- 我的句子中位数 ' + corpus.stats.median + ' 字，P90 ' + corpus.stats.p90 + ' 字；一句话占 ' + corpus.stats.oneSentencePct + '%，问句 ' + corpus.stats.questionPct + '%，表情 ' + corpus.stats.emojiPct + '%')
+    if (corpus.stats.topOpeners && corpus.stats.topOpeners.length) lines.push('- 我常用开头：' + corpus.stats.topOpeners.slice(0, 6).join('、'))
+    corpus.examples.slice(0, 6).forEach((e) => lines.push('- 「' + e + '」'))
+  }
   lines.push('')
   lines.push('【先想清楚再写（防词不达意）】')
   lines.push('1) 先用一句话说：他到底在问什么 / 在表达什么情绪 / 想要什么样的回应。')
@@ -55,9 +62,9 @@ function buildSystem() {
 }
 
 async function cfg() {
-  const local = await chrome.storage.local.get({ apiKey: '' })
+  const local = await chrome.storage.local.get({ apiKey: '', myCorpus: null })
   const sync = await chrome.storage.sync.get(DEFAULTS)
-  return { ...DEFAULTS, ...sync, apiKey: String(local.apiKey || '').trim() }
+  return { ...DEFAULTS, ...sync, apiKey: String(local.apiKey || '').trim(), myCorpus: local.myCorpus || null }
 }
 
 const endpoint = (base) => { const b = String(base || '').replace(/\/+$/, ''); return /\/v1$/.test(b) ? b + '/chat/completions' : b + '/v1/chat/completions' }
@@ -88,7 +95,7 @@ async function gen(tweet, author, quote) {
         model: c.model, temperature: 0.65, max_tokens: 700,
         response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: buildSystem() },
+          { role: 'system', content: buildSystem(c.myCorpus) },
           { role: 'user', content: '推文：' + String(tweet || '').slice(0, 2000) + '\n作者：' + (author || '未知') + (quote ? '\n他引用/回复的内容：' + String(quote).slice(0, 800) : '') + '\n我想要的语气：' + c.aiStyle },
         ],
       }),

@@ -44,3 +44,27 @@ $('test').addEventListener('click', async () => {
 
 $('reset').addEventListener('click', () => chrome.storage.local.set({ used: 0 }, () => { $('used').textContent = '0' }))
 $('demo').addEventListener('click', () => chrome.tabs.create({ url: chrome.runtime.getURL('demo.html') }))
+
+/* 学习我的推文：需要当前标签页是「你自己的主页」 */
+const showCorpus = (c) => {
+  const el = document.getElementById('learnStatus')
+  if (!el) return
+  if (!c) { el.textContent = '未学习'; return }
+  const d = new Date(c.builtAt).toLocaleString()
+  el.textContent = '已学 ' + c.count + ' 条 · 中位 ' + c.stats.median + ' 字 · 一句 ' + c.stats.oneSentencePct + '%（' + d + '）'
+}
+chrome.storage.local.get({ myCorpus: null }, (v) => showCorpus(v.myCorpus))
+document.getElementById('learn')?.addEventListener('click', async () => {
+  const el = document.getElementById('learnStatus')
+  el.textContent = '正在扫你的主页…（会自动往下滚，几十秒）'
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  if (!tab || !/x\.com|twitter\.com/.test(tab.url || '')) { el.textContent = '先打开你自己的 X 主页再点'; return }
+  try {
+    chrome.tabs.sendMessage(tab.id, { type: 'learn:start' }, (res) => {
+      if (!res) return (el.textContent = '页面没响应：刷新一下扩展再试')
+      if (!res.ok) return (el.textContent = '失败：' + res.reason)
+      el.textContent = '已学 ' + res.count + ' 条（@' + res.handle + '）· 中位 ' + res.stats.median + ' 字'
+      chrome.storage.local.get({ myCorpus: null }, (v) => showCorpus(v.myCorpus))
+    })
+  } catch (e) { el.textContent = '失败：' + e.message }
+})
