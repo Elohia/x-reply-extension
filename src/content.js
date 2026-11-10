@@ -346,6 +346,19 @@
     return all[all.length - 1]
   }
 
+  /** 把光标放到编辑器末尾（写入前必须先做，否则会插到开头/替换整段） */
+  function caretEnd(ed) {
+    try {
+      ed.focus()
+      const sel = window.getSelection()
+      const r = document.createRange()
+      r.selectNodeContents(ed)
+      r.collapse(false)
+      sel.removeAllRanges()
+      sel.addRange(r)
+    } catch (e) { /* 忽略 */ }
+  }
+
   function insertText(ed, t) {
     // 0.7 的写法：光标放到末尾 → execCommand 插入 → 只在重复时纠正。
     // 不再"先清空"、也不再补发 input 事件：那两步会把 X 编辑器的内部状态弄坏，
