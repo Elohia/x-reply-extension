@@ -7,6 +7,44 @@
  */
 importScripts('reply-style.js')
 
+/* ── 自更新：比对 GitHub 上的版本，比本地新就自我重载 ──────────────
+ * 配合 tools/auto-update.ps1（每 30 分钟 git pull）：
+ *   磁盘已经是新版 → 这里发现远端版本 > 已加载版本 → chrome.runtime.reload()
+ * 这样以后更新不需要用户点"刷新"。 */
+const VERSION_URL = 'https://raw.githubusercontent.com/Elohia/x-reply-extension/main/manifest.json'
+
+function vparts(v) { return String(v || '0').split('.').map((x) => parseInt(x, 10) || 0) }
+function newer(a, b) {
+  const x = vparts(a), y = vparts(b)
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const p = x[i] || 0, q = y[i] || 0
+    if (p > q) return true
+    if (p < q) return false
+  }
+  return false
+}
+
+async function checkSelfUpdate() {
+  try {
+    const res = await fetch(VERSION_URL, { cache: 'no-store' })
+    if (!res.ok) return
+    const remote = (await res.json()).version
+    const local = chrome.runtime.getManifest().version
+    if (newer(remote, local)) {
+      console.log('[xr] 发现新版本 ' + remote + '（当前 ' + local + '），自动重载')
+      chrome.runtime.reload()
+    }
+  } catch (e) { /* 离线就算了 */ }
+}
+
+try {
+  chrome.alarms.create('xr-self-update', { periodInMinutes: 5 })
+  chrome.alarms.onAlarm.addListener((a) => { if (a.name === 'xr-self-update') checkSelfUpdate() })
+  chrome.runtime.onInstalled.addListener(() => checkSelfUpdate())
+  chrome.runtime.onStartup.addListener(() => checkSelfUpdate())
+} catch (e) { /* 没有 alarms 权限就退化为每次唤起检查 */ }
+
+
 const DEFAULTS = { aiEnabled: false, apiBase: 'https://api.deepseek.com', model: 'deepseek-chat', aiStyle: 'direct' }
 const S = self.XReplyStyle
 

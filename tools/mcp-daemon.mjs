@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import http from 'node:http'
 
 const PORT = Number(process.env.MCP_PORT || 9777)
-const child = spawn('npx -y chrome-devtools-mcp@1.12.0 --autoConnect', {
+const child = spawn('npx -y chrome-devtools-mcp@1.12.0 --autoConnect --categoryExtensions', {
   stdio: ['pipe', 'pipe', 'pipe'], shell: true,
   env: Object.assign({}, process.env, { HTTPS_PROXY: 'http://127.0.0.1:7890', HTTP_PROXY: 'http://127.0.0.1:7890' }),
   windowsHide: true,
