@@ -1,0 +1,60 @@
+/* X 快速回复 —— 只改自己的元素，不碰 X 的样式表 */
+.xr-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; margin-left: 4px; border-radius: 50%;
+  border: 1px solid rgba(29,155,240,.55); background: transparent; color: rgb(29,155,240);
+  font: 600 11px/1 system-ui, sans-serif; cursor: pointer; opacity: .75;
+}
+.xr-btn:hover { opacity: 1; background: rgba(29,155,240,.12); }
+
+.xr-panel {
+  position: fixed; z-index: 2147483000; width: 380px; max-width: calc(100vw - 24px);
+  background: #15202b; color: #e7e9ea; border: 1px solid #38444d; border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.45); padding: 12px 12px 10px;
+  font: 13px/1.5 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+.xr-panel header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.xr-panel header b { font-size: 13px; }
+.xr-panel header .xr-close { margin-left: auto; cursor: pointer; opacity: .6; border: 0; background: none; color: inherit; font-size: 15px; }
+.xr-orig { font-size: 12px; opacity: .72; max-height: 62px; overflow: auto; border-left: 2px solid #38444d; padding-left: 8px; margin-bottom: 8px; }
+.xr-item { border: 1px solid #2f3b47; border-radius: 10px; padding: 8px; margin-bottom: 8px; }
+.xr-item .xr-angle { font-size: 11px; color: #7bb8ea; margin-bottom: 4px; }
+.xr-item textarea {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 52px;
+  background: #0f1720; color: #e7e9ea; border: 1px solid #2f3b47; border-radius: 8px; padding: 6px 8px;
+  font: inherit;
+}
+.xr-item .xr-actions { display: flex; gap: 6px; margin-top: 6px; }
+.xr-item button { cursor: pointer; border-radius: 999px; padding: 4px 10px; font: 12px/1 inherit; border: 1px solid #38444d; background: #1c2733; color: #e7e9ea; }
+.xr-item button.primary { background: #1d9bf0; border-color: #1d9bf0; color: #fff; }
+.xr-item .xr-warn { font-size: 11px; color: #f7b267; margin-top: 4px; }
+.xr-foot { display: flex; align-items: center; gap: 8px; font-size: 11px; opacity: .7; }
+.xr-foot button { border: 1px solid #38444d; background: #1c2733; color: inherit; border-radius: 999px; padding: 3px 8px; cursor: pointer; font: inherit; }
+.xr-toast { position: fixed; z-index: 2147483001; left: 50%; bottom: 32px; transform: translateX(-50%);
+  background: #1d9bf0; color: #fff; padding: 8px 14px; border-radius: 999px; font: 13px/1 system-ui; opacity: 0; transition: opacity .18s; pointer-events: none; }
+.xr-toast.on { opacity: 1; }
+
+.xr-loading { padding: 14px 6px; font-size: 12px; opacity: .75; text-align: center; }
+.xr-analysis { font-size: 12px; color: #9ad0f5; background: rgba(29,155,240,.10); border-radius: 8px; padding: 6px 8px; margin-bottom: 8px; }
+
+/* 右侧悬浮组 */
+.xr-rail { position: fixed; z-index: 2147483000; display: flex; flex-direction: column; gap: 6px; }
+.xr-rail-btn { width: 34px; height: 34px; border-radius: 10px; border: 1px solid #38444d; background: #15202b; color: #e7e9ea; cursor: pointer; font: 600 13px/1 system-ui; box-shadow: 0 4px 14px rgba(0,0,0,.4); }
+.xr-rail-btn:hover { border-color: #1d9bf0; color: #1d9bf0; }
+.xr-rail-quick { background: #1d9bf0; border-color: #1d9bf0; color: #fff; }
+/* 回复栏工具条 */
+.xr-bar { position: fixed; z-index: 2147483000; display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #15202b; border: 1px solid #38444d; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.45); font: 12px/1.4 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; color: #e7e9ea; }
+.xr-bar-label { opacity: .65; white-space: nowrap; }
+.xr-bar-chips { display: flex; gap: 6px; flex: 1; min-width: 0; overflow: hidden; }
+.xr-chip { border: 1px solid #2f3b47; background: #1c2733; color: #e7e9ea; border-radius: 999px; padding: 3px 9px; cursor: pointer; font: inherit; white-space: nowrap; }
+.xr-chip:hover { border-color: #1d9bf0; color: #7bb8ea; }
+.xr-chip-ghost { opacity: .75; }
+.xr-bar-close { border: 0; background: none; color: inherit; opacity: .6; cursor: pointer; font-size: 13px; }
+.xr-bar-loading { opacity: .7; }
+
+#xr-launcher { position: fixed; right: 22px; bottom: 96px; z-index: 2147483000; width: 46px; height: 46px; border-radius: 50%; border: 1px solid rgba(29,155,240,.5); background: #1d9bf0; color: #fff; display: flex; align-items: center; justify-content: center; cursor: grab; box-shadow: 0 6px 20px rgba(0,0,0,.45); opacity: .94; padding: 0; }
+#xr-launcher:active { cursor: grabbing; }
+#xr-launcher:hover { opacity: 1; transform: scale(1.04); }
+
+.xr-panel.xr-collapsed .xr-orig, .xr-panel.xr-collapsed .xr-body { display: none; }
+.xr-panel { max-height: calc(100vh - 24px); overflow: auto; }

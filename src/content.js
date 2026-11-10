@@ -10,6 +10,20 @@
   'use strict'
   if (window.__xrLoaded) return // 防止重复注入（popup 的补注入会和已注入的撞车）
   window.__xrLoaded = true
+
+  // 监听器先挂上：后面任何初始化报错都不会导致 popup "没响应"
+  try {
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      if (!msg) return
+      if (msg.type === 'xr:ping') { sendResponse({ ok: true, version: chrome.runtime.getManifest().version, href: location.href }); return true }
+      if (msg.type === 'learn:status') { chrome.storage.local.get({ myCorpus: null }, (v) => sendResponse(v.myCorpus || null)); return true }
+      if (msg.type === 'learn:start') {
+        learnMyPosts().then(sendResponse).catch((e) => sendResponse({ ok: false, reason: '学习出错：' + (e && e.message) }))
+        return true
+      }
+    })
+  } catch (e) { /* 连监听都挂不上就没办法了 */ }
+
   const GEN = window.XReplyGen
   if (!GEN) return
   const DEFAULTS = { enabled: true, tone: 'direct', length: 'short', aiEnabled: false, autoOpen: true }
