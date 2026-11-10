@@ -111,7 +111,7 @@
       try { localStorage.setItem('xr:launcherPos', JSON.stringify({ x: launcher.offsetLeft, y: launcher.offsetTop })) } catch { /* 忽略 */ }
       drag = null
     })
-    launcher.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openPanel() })
+    launcher.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); if (!ctxAlive()) return toast('插件刚更新过，刷新页面后恢复'); openPanel() })
     document.body.appendChild(launcher)
   }
   function unmount() {
@@ -167,6 +167,7 @@
     showBar(ed)
 
     if (!settings.aiEnabled) return
+    if (!ctxAlive()) { toast('插件刚更新过，刷新页面后可用 AI'); return }
     const res = await new Promise((resolve) => {
       try { chrome.runtime.sendMessage({ type: 'ai:gen', tweet, author: who, quote: quotedOf(art) }, resolve) } catch { resolve(null) }
     })
@@ -251,6 +252,11 @@
     items(body, local, { notice: '本地模板（等 AI 时可以先看这个）', regen: () => render(body, art, tweet, who) })
 
     if (!settings.aiEnabled) return
+
+    if (!ctxAlive()) {
+      showReloadHint(body, '插件刚更新过，这个页面已和新版本断开——刷新一下就能继续用 AI')
+      return
+    }
 
     // ② 再异步换成 AI 版本；失败就保留本地，并把原因写在顶部
     const strip = document.createElement('div')
@@ -508,6 +514,25 @@
       .then((r) => { document.documentElement.dataset.xrLearn = JSON.stringify(r).slice(0, 800) })
       .catch((e) => { document.documentElement.dataset.xrLearn = 'error:' + (e && e.message) })
   })
+
+  /** 扩展刚自我更新/重载后，旧页面的脚本会"断线"：chrome.runtime 会失效 */
+  function ctxAlive() {
+    try { return !!(chrome && chrome.runtime && chrome.runtime.id) } catch (e) { return false }
+  }
+
+  function showReloadHint(body, msg) {
+    body.innerHTML = ''
+    const box = document.createElement('div')
+    box.className = 'xr-loading'
+    box.textContent = msg
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'primary'
+    btn.style.marginTop = '8px'
+    btn.textContent = '刷新页面'
+    btn.addEventListener('click', () => location.reload())
+    body.append(box, btn)
+  }
 
   function toast(m) {
     let el = document.querySelector('.xr-toast')
